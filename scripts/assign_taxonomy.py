@@ -81,6 +81,9 @@ script_info['optional_options']=[\
         help='Taxon assignment method, either blast, rdp '
         '[default:%default]',
         choices=assignment_method_choices, default="rdp"),\
+ make_option('-a', '--threads',  type='int',
+        help='Number of threads to use for blast [default: %default]',
+        default=1), \
  make_option('-b', '--blast_db',
         help='Database to blast against.  Must provide either --blast_db or '
         '--reference_seqs_db for assignment with blast [default: %default]'),\
@@ -158,6 +161,7 @@ def main():
         else:
             params['reference_seqs_filepath'] = opts.reference_seqs_fp
         params['Max E value'] = opts.e_value
+        params['Threads'] = opts.threads
 
     elif assignment_method.startswith('rdp'):
         params['Confidence'] = opts.confidence

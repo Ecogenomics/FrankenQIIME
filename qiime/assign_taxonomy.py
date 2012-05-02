@@ -134,7 +134,7 @@ class BlastTaxonAssigner(TaxonAssigner):
         _params = {
             'Min percent identity': 0.90,
             'Max E value': 1e-30,
-            'Application': 'blastn/megablast'
+            'Application': 'blastn/megablast',
             }
         _params.update(params)
         TaxonAssigner.__init__(self, _params)
@@ -165,8 +165,8 @@ class BlastTaxonAssigner(TaxonAssigner):
         # build the mapping of sequence identifier 
         # (wrt to the blast db seqs) to taxonomy
         id_to_taxonomy_map = self._parse_id_to_taxonomy_file(\
-         open(self.Params['id_to_taxonomy_filepath'],'U')) 
-        
+         open(self.Params['id_to_taxonomy_filepath'],'U'))
+
         ## Iterate over the input self.SeqsPerBlastRun seqs at a time. 
         # There are two competing issues here when dealing with very large
         # inputs. If all sequences are read in at once, the containing object
@@ -210,16 +210,32 @@ class BlastTaxonAssigner(TaxonAssigner):
         if log_path is not None:
             num_inspected = len(result)
             logger.info('Number of sequences inspected: %s' % num_inspected)
-            num_null_hits = [r[1] for r in result.values()].count(None)
+            num_null_hits = [r for r in result.values()].count(None)
             logger.info('Number with no blast hits: %s' % num_null_hits)
 
         if result_path:
             # if the user provided a result_path, write the 
             # results to file
             of = open(result_path,'w')
-            for seq_id, (lineage, confidence, blast_hit_id) in result.items():
-                of.write('%s\t%s\t%s\t%s\n' % 
-                 (seq_id, lineage, confidence, blast_hit_id))
+            for seq_id, blast_result_dict in result.items():
+                if blast_result_dict['TAXONOMY'] == 'No blast hit':
+                    of.write('%s\t%s\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\n' %
+                    (seq_id, blast_result_dict['TAXONOMY']))
+                else:
+                    of.write('%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' % 
+                        (seq_id,
+                        blast_result_dict['TAXONOMY'],
+                        blast_result_dict['E-VALUE'],
+                        blast_result_dict['SUBJECT ID'],
+                        blast_result_dict['% IDENTITY'],
+                        blast_result_dict['ALIGNMENT LENGTH'],
+                        blast_result_dict['MISMATCHES'],
+                        blast_result_dict['GAP OPENINGS'],
+                        blast_result_dict['Q. START'],
+                        blast_result_dict['Q. END'],
+                        blast_result_dict['S. START'],
+                        blast_result_dict['S. END'])
+                        )
             of.close()
             result = None
             logger.info('Result path: %s' % result_path)
@@ -267,16 +283,14 @@ class BlastTaxonAssigner(TaxonAssigner):
         return logger
 
     def _map_ids_to_taxonomy(self, hits, id_to_taxonomy_map):
-        """ map {query_id:(best_blast_seq_id,e-val)} to {query_id:(tax,e-val,best_blast_seq_id)}
+        """ map {query_id:{best_blast_info_dict}} to {query_id:{best_blast_info_and_tax_dict}}
         """
-        for query_id, hit in hits.items():
+        for query_id, hit_info in hits.items():
             query_id=query_id.split()[0]
             try:
-                hit_id, e_value = hit 
-                hits[query_id] = \
-                  (id_to_taxonomy_map.get(hit_id, None),e_value,hit_id)
+                hits[query_id]['TAXONOMY'] = id_to_taxonomy_map.get(hit_info['SUBJECT ID'], 'No blast hit')
             except TypeError:
-                hits[query_id] = ('No blast hit', None, None)
+                hits[query_id] = {'TAXONOMY': 'No blast hit'}
 
         return hits
         
@@ -287,10 +301,9 @@ class BlastTaxonAssigner(TaxonAssigner):
         min_percent_identity = self.Params['Min percent identity']
         seq_ids = [s[0] for s in seqs]
         result = {}
-        
         blast_result = blast_seqs(\
          seqs,Blastall,blast_db=blast_db,\
-         params={'-p':'blastn','-n':'T'},\
+         params={'-p':'blastn','-n':'T','-a': self.Params['Threads']},\
          add_seq_names=False)
          
         if blast_result['StdOut']:
@@ -302,8 +315,8 @@ class BlastTaxonAssigner(TaxonAssigner):
         for seq_id in seq_ids:
             blast_result_id = seq_id.split()[0]
             try:
-                result[seq_id] = [(e['SUBJECT ID'],float(e['E-VALUE'])) \
-                 for e in blast_result[blast_result_id][0]
+                result[seq_id] = [
+                e for e in blast_result[blast_result_id][0]
                  if (float(e['E-VALUE']) <= max_evalue and \
                   float(e['% IDENTITY']) >= min_percent_identity)]
             except KeyError:
