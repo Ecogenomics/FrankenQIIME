@@ -97,11 +97,12 @@ class BwaswTaxonAssigner(TaxonAssigner):
         
         return result
     
-    def _seqs_to_best_hits(self, seq_path, database, result_path=None, logger=None):
+    def _seqs_to_best_hits(self, seq_path, database, logger=None):
         """ Assign taxonomy to (seq_id,seq) pairs
         Returns dict mapping {seq_id:(taxonomy, confidence)} for each seq,
-        by running BWA (querying seq_path against the db), and then parsing
-        the output file and mapping them through the id_to_taxonomy_map.
+        by running BWA-SW (querying seq_path against the database), and then parsing
+        the output file and mapping them through the id_to_taxonomy_map,
+        by calling _get_taxonomy_identifers_from_sam_file().
         """
         
         # Use BWASW
@@ -109,9 +110,6 @@ class BwaswTaxonAssigner(TaxonAssigner):
         sam_file_tuple = tempfile.mkstemp()
         sam_file_fd = sam_file_tuple[0]
         sam_file_path = sam_file_tuple[1]
-        #sam_file_path = '/tmp/bwasw_assigned_taxonomy.sam'
-        #sam_file_fd = open(sam_file_path,'r')
-        #sam_file_tuple = (sam_file_fd, sam_file_path)
         
         # Create stderr file for bwa
         stderr_tuple = tempfile.mkstemp()
@@ -161,9 +159,14 @@ class BwaswTaxonAssigner(TaxonAssigner):
             sys.stderr.write(bwa_stderr)
             raise error
     
-    def _get_taxonomy_identifers_from_sam_file(self, sam_file_path,logger=None):
+    def _get_taxonomy_identifers_from_sam_file(self, sam_file_path, logger=None):
         """ Take a sam file, and return a dictionary of query identifiers to identifiers from
         the database used in the creation of the sam file.
+        
+        BWA-SW detects chimeras and reports this by including two separate
+        entries in the output SAM file. Here this is handled by assigning
+        the sequence to the first hit in the SAM file, and logging that a
+        chimera was detected to the logger.
         """
         
         samfile = pysam.Samfile(sam_file_path,'r')
