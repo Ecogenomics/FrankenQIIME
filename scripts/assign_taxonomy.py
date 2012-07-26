@@ -4,7 +4,7 @@ from __future__ import division
 
 __author__ = "Antonio Gonzalez Pena"
 __copyright__ = "Copyright 2011, The QIIME Project"
-__credits__ = ["Rob Knight", "Greg Caporaso", "Kyle Bittinger", "Antonio Gonzalez Pena"] 
+__credits__ = ["Rob Knight", "Greg Caporaso", "Kyle Bittinger", "Antonio Gonzalez Pena","Adam Skarshewski","Ben Woodcroft"]
 __license__ = "GPL"
 __version__ = "1.3.0"
 __maintainer__ = "Antonio Gonzalez Pena"
@@ -19,14 +19,16 @@ from os.path import split, splitext
 from qiime.assign_taxonomy import (
     BlastTaxonAssigner, RdpTaxonAssigner, Rdp20TaxonAssigner,
     guess_rdp_version)
+from qiime.taxon_assigners.bwasw_taxon_assigner import BwaswTaxonAssigner
 
 assignment_method_constructors = {
     'blast': BlastTaxonAssigner,
     'rdp22': RdpTaxonAssigner,
     'rdp20': Rdp20TaxonAssigner,
+    'bwasw': BwaswTaxonAssigner,
 }
 
-assignment_method_choices = ['rdp','blast']
+assignment_method_choices = ['rdp','blast','bwasw']
 
 options_lookup = get_options_lookup()
 
@@ -78,7 +80,7 @@ script_info['optional_options']=[\
         'RDP Classifier.  This option is overridden by the -t and -r options. '
         '[default: %default]'),\
  make_option('-m', '--assignment_method', type='choice',
-        help='Taxon assignment method, either blast, rdp '
+        help='Taxon assignment method, either blast, rdp or bwasw'
         '[default:%default]',
         choices=assignment_method_choices, default="rdp"),\
  make_option('-a', '--threads',  type='int',
@@ -87,6 +89,9 @@ script_info['optional_options']=[\
  make_option('-b', '--blast_db',
         help='Database to blast against.  Must provide either --blast_db or '
         '--reference_seqs_db for assignment with blast [default: %default]'),\
+ make_option('-d', '--database',
+        help='Database to BWA-SW against.  REQUIRED  when bwasw is the taxon assignment '
+        'method [default: %default]'),\
  make_option('-c', '--confidence', type='float',
         help='Minimum confidence to record an assignment, only used for rdp '
         'method [default: %default]', default=0.80),\
@@ -129,6 +134,15 @@ def main():
                              'sequences fp to train the Rdp Classifier.')
         else:
             pass
+        
+    if assignment_method == 'bwasw':
+        if not opts.id_to_taxonomy_fp:
+            option_parser.error('Option --id_to_taxonomy_fp is required when ' 
+                         'assigning with bwasw.')
+        if not (opts.database):
+            option_parser.error('A bwa indexed sequence database must be '
+                                'specified (via -d) must be passed to '
+                                'assign taxonomy using BWA-SW.')
 
     taxon_assigner_constructor =\
      assignment_method_constructors[assignment_method]
@@ -168,11 +182,18 @@ def main():
         params['id_to_taxonomy_fp'] = opts.id_to_taxonomy_fp
         params['reference_sequences_fp'] = opts.reference_seqs_fp
         params['training_data_properties_fp'] = opts.training_data_properties_fp
+        
+    elif assignment_method == 'bwasw':
+        params['database'] = opts.database
+        params['id_to_taxonomy_fp'] = opts.id_to_taxonomy_fp
+        params['Threads'] = opts.threads #not yet implemented?
+        
+    
     else:
         # should not be able to get here as an unknown classifier would
         # have raised an optparse error
         exit(1)
-
+    
     taxon_assigner = taxon_assigner_constructor(params)
     taxon_assigner(input_sequences_filepath,\
      result_path=result_path,log_path=log_path)
