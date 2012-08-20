@@ -88,7 +88,7 @@ setup(name='QIIME',
       maintainer=__maintainer__,
       maintainer_email=__email__,
       url='http://www.qiime.org',
-      packages=['qiime','qiime/parallel','qiime/pycogent_backports','qiime/denoiser'],
+      packages=['qiime','qiime/parallel','qiime/pycogent_backports','qiime/denoiser','qiime/taxon_assigners'],
       scripts=glob('scripts/*py'),
       package_data={'qiime':\
                    ['support_files/qiime_config',\
