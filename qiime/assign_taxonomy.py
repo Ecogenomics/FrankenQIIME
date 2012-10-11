@@ -118,8 +118,11 @@ class TaxonAssigner(FunctionWithParams):
         for line in f:
             line = line.strip()
             if line:
-                identifier, taxonomy = map(strip, line.split('\t'))
-                result[identifier] = taxonomy
+                try:
+                    identifier, taxonomy = map(strip, line.split('\t'))
+                    result[identifier] = taxonomy
+                except:
+                    print line, identifier, taxonomy
         return result 
 
 
